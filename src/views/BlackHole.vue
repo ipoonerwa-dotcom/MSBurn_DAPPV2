@@ -211,8 +211,13 @@ async function loadChannelInfo() {
     channelInfo.refCredited = fmt(info.refCredited)
     channelInfo.lbCredited = fmt(info.lbCredited)
 
+    // 用2倍出局上限约束pending（合约可能返回溢出值）
+    const totalClaimed = BigInt(info.withdrawn) + BigInt(info.refCredited) + BigInt(info.lbCredited)
+    const totalTarget = BigInt(info.totalReward)
+    const maxRemaining = totalTarget > totalClaimed ? totalTarget - totalClaimed : 0n
+    const pendingRaw = BigInt(info.pending) > maxRemaining ? maxRemaining : BigInt(info.pending)
+
     // 获取奖池实际余额，显示真实可领取金额
-    const pendingRaw = BigInt(info.pending)
     let poolBalance
     if (isBNB) {
       poolBalance = await props.provider.getBalance(DAPP_ADDRESS)
@@ -225,8 +230,6 @@ async function loadChannelInfo() {
     channelInfo.pendingRaw = fmt(pendingRaw)
     channelInfo.poolInsufficient = pendingRaw > 0n && pendingRaw > poolBalance
 
-    const totalClaimed = BigInt(info.withdrawn) + BigInt(info.refCredited) + BigInt(info.lbCredited)
-    const totalTarget = BigInt(info.totalReward)
     channelInfo.progressPct = totalTarget > 0n
       ? Math.min(100, Number((totalClaimed * 100n) / totalTarget))
       : 0

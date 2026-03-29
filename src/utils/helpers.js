@@ -45,12 +45,20 @@ export function formatCountdown(seconds) {
 }
 
 /**
- * 解析URL中的推荐人地址
+ * 解析URL中的推荐人地址，并缓存到sessionStorage防止页面导航后丢失
  */
 export function getRefFromURL() {
   const hash = window.location.hash
-  const match = hash.match(/[?&]ref=([0-9a-fA-Fx]+)/)
-  return match ? match[1] : '0x0000000000000000000000000000000000000000'
+  const match = hash.match(/[?&]ref=(0x[0-9a-fA-F]{40})/)
+  if (match) {
+    sessionStorage.setItem('msburn_ref', match[1])
+    return match[1]
+  }
+  const cached = sessionStorage.getItem('msburn_ref')
+  if (cached && /^0x[0-9a-fA-F]{40}$/.test(cached)) {
+    return cached
+  }
+  return '0x0000000000000000000000000000000000000000'
 }
 
 /**

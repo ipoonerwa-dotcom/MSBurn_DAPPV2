@@ -44,14 +44,16 @@
 import { ref, shallowRef, computed, onMounted } from 'vue'
 import { BrowserProvider, JsonRpcProvider } from 'ethers'
 import StarsBg from './components/StarsBg.vue'
+import { getRefFromURL } from './utils/helpers.js'
 
 const walletAddress = ref('')
 const walletConnected = ref(false)
 const provider = shallowRef(null)
 const signer = shallowRef(null)
 
-// 启动时用公共RPC初始化provider，这样未连钱包也能读取链上数据
+// 启动时立刻捕获ref参数并缓存，防止后续导航丢失
 onMounted(() => {
+  getRefFromURL()
   if (!provider.value) {
     provider.value = new JsonRpcProvider('https://bsc-dataseed.binance.org/')
   }

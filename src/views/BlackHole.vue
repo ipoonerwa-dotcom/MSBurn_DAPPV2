@@ -281,25 +281,34 @@ async function handleClaim() {
   try {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.signer)
 
-    // 领取前检查合约余额是否足够
-    if (activeChannel.value === 'bnb') {
-      const provider = props.signer.provider
-      const contractBalance = await provider.getBalance(DAPP_ADDRESS)
-      const pending = await dapp.pendingBNBDividend(props.wallet)
-      if (contractBalance < pending) {
-        alert('当前合约BNB余额不足，请稍后再试，避免资金损失')
-        claimLoading.value = false
-        return
-      }
+    // 领取前检查：用2倍出局上限约束pending（合约可能返回溢出值）
+    const isBNB = activeChannel.value === 'bnb'
+    const infoFn = isBNB ? 'getUserBNBInfo' : 'getUserTokenInfo'
+    const claimInfo = await dapp[infoFn](props.wallet)
+    const claimedSum = BigInt(claimInfo.withdrawn) + BigInt(claimInfo.refCredited) + BigInt(claimInfo.lbCredited)
+    const cap = BigInt(claimInfo.totalReward)
+    const maxPending = cap > claimedSum ? cap - claimedSum : 0n
+    const rawPending = BigInt(claimInfo.pending)
+    const realPending = rawPending > maxPending ? maxPending : rawPending
+
+    if (realPending === 0n) {
+      alert('当前无可领取分红')
+      claimLoading.value = false
+      return
+    }
+
+    // 检查合约余额是否足够
+    let contractBalance
+    if (isBNB) {
+      contractBalance = await props.signer.provider.getBalance(DAPP_ADDRESS)
     } else {
       const tokenContract = new Contract(TOKEN_ADDRESS, TOKEN_ABI, props.signer.provider)
-      const contractBalance = await tokenContract.balanceOf(DAPP_ADDRESS)
-      const pending = await dapp.pendingTokenDividend(props.wallet)
-      if (contractBalance < pending) {
-        alert('当前合约代币余额不足，请稍后再试')
-        claimLoading.value = false
-        return
-      }
+      contractBalance = await tokenContract.balanceOf(DAPP_ADDRESS)
+    }
+    if (contractBalance < realPending) {
+      alert(isBNB ? '当前合约BNB余额不足，请稍后再试，避免资金损失' : '当前合约代币余额不足，请稍后再试')
+      claimLoading.value = false
+      return
     }
 
     const fn = activeChannel.value === 'bnb' ? 'claimBNBDividend' : 'claimTokenDividend'

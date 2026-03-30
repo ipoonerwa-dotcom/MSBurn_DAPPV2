@@ -53,8 +53,8 @@
         <span class="gradient-text" style="font-weight: 700;">5天</span>
       </div>
       <div class="stake-info-row">
-        <span>💰 分红来源</span>
-        <span>盈利税BNB，每24h结算50%</span>
+        <span>💰 奖励方式</span>
+        <span>质押获取代币奖励</span>
       </div>
 
       <div v-if="hasActiveStake" class="pool-warning" style="margin-top: 12px;">

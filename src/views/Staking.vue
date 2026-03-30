@@ -27,7 +27,7 @@
         <span class="icon">📥</span>
         <span>质押代币</span>
         <span style="margin-left: auto; font-size: 12px; color: var(--text-secondary);">
-          10万 - 50万枚 (10万倍数)
+          10万 - 100万枚
         </span>
       </div>
 
@@ -42,7 +42,7 @@
       </div>
 
       <div class="quick-btns">
-        <button v-for="v in [100000, 200000, 300000, 400000, 500000]" :key="v"
+        <button v-for="v in [100000, 200000, 500000, 1000000]" :key="v"
           class="quick-btn" @click="stakeAmount = v">
           {{ v / 10000 }}万
         </button>
@@ -50,14 +50,17 @@
 
       <div class="stake-info-row">
         <span>🔒 锁仓时间</span>
-        <span class="gradient-text" style="font-weight: 700;">48小时</span>
+        <span class="gradient-text" style="font-weight: 700;">5天</span>
       </div>
       <div class="stake-info-row">
         <span>💰 分红来源</span>
         <span>盈利税BNB，每24h结算50%</span>
       </div>
 
-      <button class="btn-primary" @click="handleStake" :disabled="stakeLoading" style="margin-top: 12px;">
+      <div v-if="hasActiveStake" class="pool-warning" style="margin-top: 12px;">
+        当前已有质押，到期领取后方可再次质押
+      </div>
+      <button class="btn-primary" @click="handleStake" :disabled="stakeLoading || hasActiveStake" style="margin-top: 12px;">
         <span v-if="stakeLoading" class="loading-spin"></span>
         <span v-else>⛏ 质押</span>
       </button>
@@ -111,7 +114,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Contract, parseUnits } from 'ethers'
 import { STAKING_ADDRESS, STAKING_ABI, TOKEN_ADDRESS, TOKEN_ABI } from '../utils/contracts.js'
 import { fmtBNB, fmtToken, formatCountdown } from '../utils/helpers.js'
@@ -123,6 +126,11 @@ const stakeLoading = ref(false)
 const unstakeLoading = ref(-1)
 const stakes = ref([])
 let timer = null
+
+// 是否有未完成的质押（锁仓中或可领取但未领取）
+const hasActiveStake = computed(() => {
+  return stakes.value.some(s => !s.claimed)
+})
 
 const poolInfo = reactive({
   rewardPool: '--',
@@ -189,6 +197,7 @@ async function loadStakes() {
 
 async function handleStake() {
   if (!props.signer) return alert('请先连接钱包')
+  if (hasActiveStake.value) return alert('当前已有质押，到期领取后方可再次质押')
   stakeLoading.value = true
   try {
     const amt = parseUnits(String(stakeAmount.value || '0'), 18)
@@ -337,6 +346,16 @@ watch(() => props.wallet, () => { loadPoolInfo(); loadStakes() })
 }
 .stake-detail .label { color: var(--text-secondary); }
 .stake-detail .value { color: var(--text-primary); font-weight: 600; font-family: var(--font-mono); }
+.pool-warning {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+
 .stake-detail .value.highlight {
   background: var(--gradient-fire);
   -webkit-background-clip: text;

@@ -10,27 +10,13 @@
         <div class="stat-label">总销毁</div>
       </div>
       <div class="stat-item">
-        <div class="stat-value">{{ globalStats.totalBNB }}</div>
-        <div class="stat-label">总投入BNB</div>
+        <div class="stat-value">{{ globalStats.totalInvested }}</div>
+        <div class="stat-label">总投入</div>
       </div>
       <div class="stat-item">
         <div class="stat-value">{{ globalStats.participants }}</div>
         <div class="stat-label">参与人数</div>
       </div>
-    </div>
-
-    <!-- 通道切换 -->
-    <div class="tab-switch">
-      <button
-        class="tab-item"
-        :class="{ active: activeChannel === 'bnb' }"
-        @click="activeChannel = 'bnb'"
-      >BNB通道</button>
-      <button
-        class="tab-item"
-        :class="{ active: activeChannel === 'token' }"
-        @click="activeChannel = 'token'"
-      >代币通道</button>
     </div>
 
     <!-- 参与卡片 -->
@@ -39,51 +25,34 @@
         <span class="icon">🌀</span>
         <span>打入黑洞</span>
         <span style="margin-left: auto; font-size: 12px; color: var(--text-secondary);">
-          {{ activeChannel === 'bnb' ? '0.1 - 10 BNB' : '10万 - 100万枚' }}
+          10万 - 20万枚
         </span>
       </div>
 
-      <!-- BNB 通道 -->
-      <div v-if="activeChannel === 'bnb'">
-        <div class="input-group">
-          <input
-            v-model="bnbAmount"
-            type="number"
-            step="0.1"
-            min="0.1"
-            max="10"
-            placeholder="输入BNB数量"
-          />
-          <span class="unit">BNB</span>
-        </div>
-        <div class="quick-btns">
-          <button v-for="v in [0.1, 0.5, 1, 5, 10]" :key="v" class="quick-btn" @click="bnbAmount = v">{{ v }}</button>
-        </div>
+      <div class="input-group">
+        <input
+          v-model="tokenAmount"
+          type="number"
+          step="10000"
+          placeholder="输入代币数量"
+        />
+        <span class="unit">枚</span>
       </div>
-
-      <!-- 代币通道 -->
-      <div v-else>
-        <div class="input-group">
-          <input
-            v-model="tokenAmount"
-            type="number"
-            step="100000"
-            placeholder="输入代币数量"
-          />
-          <span class="unit">枚</span>
-        </div>
-        <div class="quick-btns">
-          <button v-for="v in [100000, 200000, 500000, 1000000]" :key="v" class="quick-btn" @click="tokenAmount = v">
-            {{ v >= 10000 ? (v / 10000) + '万' : v }}
-          </button>
-        </div>
+      <div class="quick-btns">
+        <button v-for="v in [100000, 120000, 150000, 200000]" :key="v" class="quick-btn" @click="tokenAmount = v">
+          {{ v / 10000 }}万
+        </button>
       </div>
 
       <div class="split-info">
-        <span>20%销毁</span><span>50%分红</span><span>25%推广</span><span>5%排行榜</span>
+        <span>20%销毁</span><span>35%分红</span><span>15%沉淀</span><span>25%推广</span><span>5%排行榜</span>
       </div>
 
-      <button class="btn-primary" @click="handleParticipate" :disabled="loading">
+      <div v-if="userInfo.active" class="pool-warning">
+        当前已在参与中，出局后方可再次参与
+      </div>
+
+      <button class="btn-primary" @click="handleParticipate" :disabled="loading || userInfo.active">
         <span v-if="loading" class="loading-spin"></span>
         <span v-else>🌀 打入黑洞</span>
       </button>
@@ -93,46 +62,52 @@
     <div class="glass-card">
       <div class="section-title">
         <span class="icon">📋</span>
-        <span>我的{{ activeChannel === 'bnb' ? 'BNB' : '代币' }}通道</span>
+        <span>我的数据</span>
       </div>
 
       <div class="data-row">
+        <span class="label">状态</span>
+        <span class="value" :style="{ color: userInfo.active ? 'var(--accent-green)' : 'var(--text-dim)' }">
+          {{ userInfo.active ? '参与中' : '未参与' }}
+        </span>
+      </div>
+      <div class="data-row">
         <span class="label">投入权重</span>
-        <span class="value">{{ channelInfo.weight }}</span>
+        <span class="value">{{ userInfo.weight }} 枚</span>
       </div>
       <div class="data-row">
         <span class="label">2倍出局上限</span>
-        <span class="value highlight">{{ channelInfo.totalReward }}</span>
+        <span class="value highlight">{{ userInfo.totalReward }} 枚</span>
       </div>
       <div class="data-row">
         <span class="label">已领分红</span>
-        <span class="value">{{ channelInfo.withdrawn }}</span>
+        <span class="value">{{ userInfo.withdrawn }} 枚</span>
       </div>
       <div class="data-row">
         <span class="label">推广奖计入</span>
-        <span class="value">{{ channelInfo.refCredited }}</span>
+        <span class="value">{{ userInfo.refCredited }} 枚</span>
       </div>
       <div class="data-row">
         <span class="label">排行榜奖计入</span>
-        <span class="value">{{ channelInfo.lbCredited }}</span>
+        <span class="value">{{ userInfo.lbCredited }} 枚</span>
       </div>
       <div class="data-row">
         <span class="label">待领取</span>
-        <span class="value highlight" style="font-size: 16px;">{{ channelInfo.hasPending ? '有可领分红' : '暂无' }}</span>
+        <span class="value highlight" style="font-size: 16px;">{{ userInfo.pending }} 枚</span>
       </div>
 
       <!-- 出局进度条 -->
       <div class="progress-bar-wrap">
         <div class="progress-label">
           <span>出局进度</span>
-          <span>{{ channelInfo.progressPct }}%</span>
+          <span>{{ userInfo.progressPct }}%</span>
         </div>
         <div class="progress-bar">
-          <div class="progress-fill" :style="{ width: channelInfo.progressPct + '%' }"></div>
+          <div class="progress-fill" :style="{ width: userInfo.progressPct + '%' }"></div>
         </div>
       </div>
 
-      <button class="btn-secondary" @click="handleClaim" :disabled="claimLoading" style="margin-top: 14px;">
+      <button class="btn-secondary" @click="handleClaim" :disabled="claimLoading || !userInfo.active || userInfo.pending === '0'" style="margin-top: 14px;">
         <span v-if="claimLoading" class="loading-spin"></span>
         <span v-else>领取分红</span>
       </button>
@@ -142,32 +117,31 @@
 
 <script setup>
 import { ref, reactive, watch, onMounted } from 'vue'
-import { Contract, parseEther, parseUnits } from 'ethers'
+import { Contract, parseUnits } from 'ethers'
 import BlackHoleVortex from '../components/BlackHoleVortex.vue'
 import { DAPP_ADDRESS, DAPP_ABI, TOKEN_ADDRESS, TOKEN_ABI } from '../utils/contracts.js'
-import { fmtBNB, fmtToken, getRefFromURL } from '../utils/helpers.js'
+import { fmtToken, getRefFromURL } from '../utils/helpers.js'
 
 const props = defineProps(['wallet', 'provider', 'signer'])
 
-const activeChannel = ref('bnb')
-const bnbAmount = ref('')
 const tokenAmount = ref('')
 const loading = ref(false)
 const claimLoading = ref(false)
 
 const globalStats = reactive({
   totalBurned: '--',
-  totalBNB: '--',
+  totalInvested: '--',
   participants: '--',
 })
 
-const channelInfo = reactive({
+const userInfo = reactive({
   weight: '--',
   totalReward: '--',
   withdrawn: '--',
   refCredited: '--',
   lbCredited: '--',
-  hasPending: false,       // 是否有可领分红
+  pending: '--',
+  active: false,
   progressPct: 0,
 })
 
@@ -176,79 +150,68 @@ async function loadGlobalStats() {
   if (!props.provider) return
   try {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.provider)
-    const [burned, bnbInvested, pBNB, pToken] = await Promise.all([
+    const [burned, invested, participants] = await Promise.all([
       dapp.totalTokenBurned(),
-      dapp.totalBNBInvested(),
-      dapp.totalParticipantsBNB(),
-      dapp.totalParticipantsToken(),
+      dapp.totalTokenInvested(),
+      dapp.totalParticipants(),
     ])
-    globalStats.totalBurned = fmtToken(burned)
-    globalStats.totalBNB = fmtBNB(bnbInvested)
-    globalStats.participants = (Number(pBNB) + Number(pToken)).toString()
+    globalStats.totalBurned = fmtToken(burned) + ' 枚'
+    globalStats.totalInvested = fmtToken(invested) + ' 枚'
+    globalStats.participants = Number(participants).toString()
   } catch (e) {
     console.error('loadGlobalStats:', e)
   }
 }
 
-// 加载用户通道数据
-async function loadChannelInfo() {
+// 加载用户数据
+async function loadUserInfo() {
   if (!props.provider || !props.wallet) return
   try {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.provider)
-    const isBNB = activeChannel.value === 'bnb'
-    const fn = isBNB ? 'getUserBNBInfo' : 'getUserTokenInfo'
-    const info = await dapp[fn](props.wallet)
-    const fmt = isBNB ? fmtBNB : (v) => fmtToken(v)
+    const info = await dapp.getUserInfo(props.wallet)
 
-    channelInfo.weight = fmt(info.weight)
-    channelInfo.totalReward = fmt(info.totalReward)
-    channelInfo.withdrawn = fmt(info.withdrawn)
-    channelInfo.refCredited = fmt(info.refCredited)
-    channelInfo.lbCredited = fmt(info.lbCredited)
+    userInfo.weight = fmtToken(info.weight)
+    userInfo.totalReward = fmtToken(info.totalReward)
+    userInfo.withdrawn = fmtToken(info.withdrawn)
+    userInfo.refCredited = fmtToken(info.refCredited)
+    userInfo.lbCredited = fmtToken(info.lbCredited)
+    userInfo.active = info.active
 
-    // 用2倍出局上限约束pending（合约可能返回溢出值）
     const totalClaimed = BigInt(info.withdrawn) + BigInt(info.refCredited) + BigInt(info.lbCredited)
     const totalTarget = BigInt(info.totalReward)
-    const maxRemaining = totalTarget > totalClaimed ? totalTarget - totalClaimed : 0n
-    const pendingRaw = BigInt(info.pending) > maxRemaining ? maxRemaining : BigInt(info.pending)
 
-    channelInfo.hasPending = pendingRaw > 0n
+    userInfo.pending = fmtToken(info.pending)
 
-    channelInfo.progressPct = totalTarget > 0n
+    userInfo.progressPct = totalTarget > 0n
       ? Math.min(100, Number((totalClaimed * 100n) / totalTarget))
       : 0
   } catch (e) {
-    console.error('loadChannelInfo:', e)
+    console.error('loadUserInfo:', e)
   }
 }
 
 // 打入黑洞
 async function handleParticipate() {
   if (!props.signer) return alert('请先连接钱包')
+  if (userInfo.active) return alert('当前已在参与中，出局后方可再次参与')
   loading.value = true
   try {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.signer)
+    const tokenContract = new Contract(TOKEN_ADDRESS, TOKEN_ABI, props.signer)
     const refAddr = getRefFromURL()
+    const amt = parseUnits(String(tokenAmount.value || '0'), 18)
 
-    if (activeChannel.value === 'bnb') {
-      const val = parseEther(String(bnbAmount.value || '0'))
-      const tx = await dapp.participateBNB(refAddr, { value: val })
-      await tx.wait()
-    } else {
-      // 先approve
-      const tokenContract = new Contract(TOKEN_ADDRESS, TOKEN_ABI, props.signer)
-      const amt = parseUnits(String(tokenAmount.value || '0'), 18)
-      const allowance = await tokenContract.allowance(props.wallet, DAPP_ADDRESS)
-      if (allowance < amt) {
-        const appTx = await tokenContract.approve(DAPP_ADDRESS, amt)
-        await appTx.wait()
-      }
-      const tx = await dapp.participateToken(refAddr, amt)
-      await tx.wait()
+    // approve
+    const allowance = await tokenContract.allowance(props.wallet, DAPP_ADDRESS)
+    if (allowance < amt) {
+      const appTx = await tokenContract.approve(DAPP_ADDRESS, amt)
+      await appTx.wait()
     }
-    bnbAmount.value = ''
+
+    const tx = await dapp.participate(refAddr, amt)
+    await tx.wait()
     tokenAmount.value = ''
-    await loadChannelInfo()
+    await loadUserInfo()
     await loadGlobalStats()
   } catch (e) {
     console.error('participate error:', e)
@@ -264,56 +227,26 @@ async function handleClaim() {
   claimLoading.value = true
   try {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.signer)
-
-    // 领取前检查：用2倍出局上限约束pending（合约可能返回溢出值）
-    const isBNB = activeChannel.value === 'bnb'
-    const infoFn = isBNB ? 'getUserBNBInfo' : 'getUserTokenInfo'
-    const claimInfo = await dapp[infoFn](props.wallet)
-    const claimedSum = BigInt(claimInfo.withdrawn) + BigInt(claimInfo.refCredited) + BigInt(claimInfo.lbCredited)
-    const cap = BigInt(claimInfo.totalReward)
-    const maxPending = cap > claimedSum ? cap - claimedSum : 0n
-    const rawPending = BigInt(claimInfo.pending)
-    const realPending = rawPending > maxPending ? maxPending : rawPending
-
-    if (realPending === 0n) {
-      alert('当前无可领取分红')
-      claimLoading.value = false
-      return
-    }
-
-    // 检查合约余额是否足够（扣除排行榜预留）
-    const lbPool = await dapp.getLeaderboardPoolInfo()
-    const lbReserve = isBNB ? BigInt(lbPool.bnbPool) : BigInt(lbPool.tokenPool)
-
-    let contractBalance
-    if (isBNB) {
-      contractBalance = await props.signer.provider.getBalance(DAPP_ADDRESS)
-    } else {
-      const tokenContract = new Contract(TOKEN_ADDRESS, TOKEN_ABI, props.signer.provider)
-      contractBalance = await tokenContract.balanceOf(DAPP_ADDRESS)
-    }
-    const availableBalance = contractBalance > lbReserve ? contractBalance - lbReserve : 0n
-    if (availableBalance < realPending) {
-      alert('当前奖池未累计足够奖励，请稍后再试')
-      claimLoading.value = false
-      return
-    }
-
-    const fn = activeChannel.value === 'bnb' ? 'claimBNBDividend' : 'claimTokenDividend'
-    const tx = await dapp[fn]()
+    const tx = await dapp.claimDividend()
     await tx.wait()
-    await loadChannelInfo()
+    await loadUserInfo()
   } catch (e) {
     console.error('claim error:', e)
-    alert('领取失败: ' + (e?.reason || e?.message || '未知错误'))
+    const reason = e?.reason || e?.message || '未知错误'
+    if (reason.includes('nothing')) {
+      alert('当前无可领取分红')
+    } else if (reason.includes('pool insufficient')) {
+      alert('当前奖池未累计足够奖励，请稍后再试')
+    } else {
+      alert('领取失败: ' + reason)
+    }
   } finally {
     claimLoading.value = false
   }
 }
 
-watch(() => props.wallet, () => { loadGlobalStats(); loadChannelInfo() })
-watch(activeChannel, () => loadChannelInfo())
-onMounted(() => { loadGlobalStats(); loadChannelInfo() })
+watch(() => props.wallet, () => { loadGlobalStats(); loadUserInfo() })
+onMounted(() => { loadGlobalStats(); loadUserInfo() })
 </script>
 
 <style scoped>
@@ -383,7 +316,7 @@ onMounted(() => { loadGlobalStats(); loadChannelInfo() })
 }
 
 .pool-warning {
-  margin-top: 6px;
+  margin-bottom: 12px;
   padding: 8px 12px;
   font-size: 12px;
   color: #ff9800;

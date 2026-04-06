@@ -25,7 +25,7 @@
         </button>
       </div>
 
-      <div v-if="copied" class="copied-tip">✅ 已复制到剪贴板</div>
+      <div v-if="copied" class="copied-tip">已复制到剪贴板</div>
     </div>
 
     <!-- 推广数据 -->
@@ -45,19 +45,15 @@
           <div class="stat-label">二代人数</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">{{ refInfo.active ? '✅' : '❌' }}</div>
-          <div class="stat-label">活跃状态</div>
+          <div class="stat-value">{{ refInfo.active ? '活跃' : '未参与' }}</div>
+          <div class="stat-label">本人状态</div>
         </div>
       </div>
 
       <div style="margin-top: 14px;">
         <div class="data-row">
-          <span class="label">BNB推广奖励</span>
-          <span class="value highlight">{{ refInfo.refBNB }} BNB</span>
-        </div>
-        <div class="data-row">
-          <span class="label">代币推广奖励</span>
-          <span class="value highlight">{{ refInfo.refToken }} 枚</span>
+          <span class="label">累计推广奖励</span>
+          <span class="value highlight">{{ refInfo.refTotal }} 枚</span>
         </div>
         <div class="data-row">
           <span class="label">我的推荐人</span>
@@ -84,15 +80,15 @@
         </div>
         <div class="rule-item">
           <span class="rule-num">3</span>
-          <span>推荐人必须处于活跃状态（任一通道有仓位）才能获得奖励</span>
+          <span>推荐人必须处于活跃状态（有仓位参与中）才能获得奖励</span>
         </div>
         <div class="rule-item">
           <span class="rule-num">4</span>
-          <span>同通道推广奖记入出局进度；跨通道推广奖直接到账</span>
+          <span>推广奖励计入出局进度（正拨比），与分红、排行榜奖共享2倍出局上限</span>
         </div>
         <div class="rule-item">
           <span class="rule-num">5</span>
-          <span>推荐关系一旦绑定，永久有效，跨通道共享</span>
+          <span>推荐关系一旦绑定，永久有效</span>
         </div>
       </div>
     </div>
@@ -103,7 +99,7 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { Contract } from 'ethers'
 import { DAPP_ADDRESS, DAPP_ABI } from '../utils/contracts.js'
-import { fmtBNB, fmtToken, shortAddr, makeRefLink } from '../utils/helpers.js'
+import { fmtToken, shortAddr, makeRefLink } from '../utils/helpers.js'
 
 const props = defineProps(['wallet', 'provider', 'signer'])
 
@@ -113,8 +109,7 @@ const refInfo = reactive({
   referrer: '--',
   l1: '--',
   l2: '--',
-  refBNB: '--',
-  refToken: '--',
+  refTotal: '--',
   active: false,
 })
 
@@ -131,8 +126,7 @@ async function loadRefInfo() {
     refInfo.referrer = info.ref === '0x0000000000000000000000000000000000000000' ? '无' : shortAddr(info.ref)
     refInfo.l1 = Number(info.l1).toString()
     refInfo.l2 = Number(info.l2).toString()
-    refInfo.refBNB = fmtBNB(info.refBNB)
-    refInfo.refToken = fmtToken(info.refTk)
+    refInfo.refTotal = fmtToken(info.refTotal)
     refInfo.active = info.active
   } catch (e) {
     console.error('loadRefInfo:', e)
@@ -146,7 +140,6 @@ async function copyLink() {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
   } catch {
-    // fallback
     const ta = document.createElement('textarea')
     ta.value = refLink.value
     document.body.appendChild(ta)
@@ -208,7 +201,6 @@ onMounted(loadRefInfo)
   gap: 10px;
 }
 
-/* 规则列表 */
 .rules-list {
   display: flex;
   flex-direction: column;

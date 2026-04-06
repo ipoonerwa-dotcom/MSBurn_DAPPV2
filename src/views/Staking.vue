@@ -9,15 +9,15 @@
     <div class="stats-grid" style="margin-bottom: 20px;">
       <div class="stat-item">
         <div class="stat-value">{{ poolInfo.rewardPool }}</div>
-        <div class="stat-label">奖池BNB</div>
+        <div class="stat-label">奖池余额</div>
       </div>
       <div class="stat-item">
         <div class="stat-value">{{ poolInfo.totalStaked }}</div>
         <div class="stat-label">总质押</div>
       </div>
       <div class="stat-item">
-        <div class="stat-value">{{ poolInfo.nextSettle }}</div>
-        <div class="stat-label">下次结算</div>
+        <div class="stat-value">{{ poolInfo.totalPaid }}</div>
+        <div class="stat-label">累计发放</div>
       </div>
     </div>
 
@@ -27,7 +27,7 @@
         <span class="icon">📥</span>
         <span>质押代币</span>
         <span style="margin-left: auto; font-size: 12px; color: var(--text-secondary);">
-          10万 - 100万枚
+          10万 - 50万枚
         </span>
       </div>
 
@@ -35,32 +35,45 @@
         <input
           v-model="stakeAmount"
           type="number"
-          step="100000"
+          step="10000"
           placeholder="输入质押数量"
         />
         <span class="unit">枚</span>
       </div>
 
       <div class="quick-btns">
-        <button v-for="v in [100000, 200000, 500000, 1000000]" :key="v"
+        <button v-for="v in [100000, 200000, 300000, 500000]" :key="v"
           class="quick-btn" @click="stakeAmount = v">
           {{ v / 10000 }}万
         </button>
       </div>
 
-      <div class="stake-info-row">
-        <span>🔒 锁仓时间</span>
-        <span class="gradient-text" style="font-weight: 700;">5天</span>
+      <!-- 档位选择 -->
+      <div class="tier-selector">
+        <div
+          v-for="(t, idx) in tierList"
+          :key="idx"
+          class="tier-card"
+          :class="{ active: selectedTier === idx, disabled: !t.enabled }"
+          @click="t.enabled && (selectedTier = idx)"
+        >
+          <div class="tier-duration">{{ t.durationText }}</div>
+          <div class="tier-rate gradient-text">{{ t.rateText }}</div>
+          <div class="tier-reward" v-if="stakeAmount > 0">
+            ≈{{ formatReward(idx) }}枚
+          </div>
+        </div>
       </div>
+
       <div class="stake-info-row">
         <span>💰 奖励方式</span>
         <span>质押获取代币奖励</span>
       </div>
 
-      <div v-if="hasActiveStake" class="pool-warning" style="margin-top: 12px;">
+      <div v-if="hasActive" class="pool-warning" style="margin-top: 12px;">
         当前已有质押，到期领取后方可再次质押
       </div>
-      <button class="btn-primary" @click="handleStake" :disabled="stakeLoading || hasActiveStake" style="margin-top: 12px;">
+      <button class="btn-primary" @click="handleStake" :disabled="stakeLoading || hasActive" style="margin-top: 12px;">
         <span v-if="stakeLoading" class="loading-spin"></span>
         <span v-else>⛏ 质押</span>
       </button>
@@ -83,6 +96,7 @@
       <div v-for="(s, idx) in stakes" :key="idx" class="stake-card">
         <div class="stake-header">
           <span class="stake-id">#{{ idx + 1 }}</span>
+          <span class="stake-tier">{{ s.tierText }}</span>
           <span class="stake-status" :class="s.statusClass">{{ s.statusText }}</span>
         </div>
         <div class="stake-body">
@@ -95,8 +109,8 @@
             <span class="value">{{ s.timeDisplay }}</span>
           </div>
           <div class="stake-detail">
-            <span class="label">累计收益</span>
-            <span class="value highlight">{{ s.rewardDisplay }} BNB</span>
+            <span class="label">预计奖励</span>
+            <span class="value highlight">{{ s.rewardDisplay }} 枚</span>
           </div>
         </div>
         <button
@@ -106,7 +120,7 @@
           :disabled="unstakeLoading === idx"
         >
           <span v-if="unstakeLoading === idx" class="loading-spin"></span>
-          <span v-else>🎁 领取本金+收益</span>
+          <span v-else>🎁 领取本金+奖励</span>
         </button>
       </div>
     </div>
@@ -114,40 +128,72 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { Contract, parseUnits } from 'ethers'
 import { STAKING_ADDRESS, STAKING_ABI, TOKEN_ADDRESS, TOKEN_ABI } from '../utils/contracts.js'
-import { fmtBNB, fmtToken, formatCountdown } from '../utils/helpers.js'
+import { fmtToken, formatCountdown } from '../utils/helpers.js'
 
 const props = defineProps(['wallet', 'provider', 'signer'])
 
 const stakeAmount = ref('')
+const selectedTier = ref(0)
 const stakeLoading = ref(false)
 const unstakeLoading = ref(-1)
 const stakes = ref([])
+const hasActive = ref(false)
+const tierList = ref([])
 let timer = null
-
-// 是否有未完成的质押（锁仓中或可领取但未领取）
-const hasActiveStake = computed(() => {
-  return stakes.value.some(s => !s.claimed)
-})
 
 const poolInfo = reactive({
   rewardPool: '--',
   totalStaked: '--',
-  nextSettle: '--',
+  totalPaid: '--',
 })
+
+const tierDurationText = (seconds) => {
+  const days = Math.floor(seconds / 86400)
+  if (days > 0) return days + '天'
+  const hours = Math.floor(seconds / 3600)
+  return hours + '小时'
+}
+
+function formatReward(tierIdx) {
+  const t = tierList.value[tierIdx]
+  if (!t || !stakeAmount.value) return '0'
+  const reward = Math.floor(Number(stakeAmount.value) * t.rewardRate / 10000)
+  return reward.toLocaleString()
+}
+
+async function loadTiers() {
+  if (!props.provider) return
+  try {
+    const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, props.provider)
+    const count = await staking.getTierCount()
+    const list = []
+    for (let i = 0; i < Number(count); i++) {
+      const t = await staking.tiers(i)
+      list.push({
+        duration: Number(t.duration),
+        rewardRate: Number(t.rewardRate),
+        enabled: t.enabled,
+        durationText: tierDurationText(Number(t.duration)),
+        rateText: (Number(t.rewardRate) / 100).toFixed(0) + '%',
+      })
+    }
+    tierList.value = list
+  } catch (e) {
+    console.error('loadTiers:', e)
+  }
+}
 
 async function loadPoolInfo() {
   if (!props.provider) return
   try {
     const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, props.provider)
     const info = await staking.getPoolInfo()
-    poolInfo.rewardPool = fmtBNB(info.pool)
-    poolInfo.totalStaked = fmtToken(info.staked)
-    const now = Math.floor(Date.now() / 1000)
-    const remain = Number(info.nextSettle) - now
-    poolInfo.nextSettle = remain > 0 ? formatCountdown(remain) : '可结算'
+    poolInfo.rewardPool = fmtToken(info._rewardPool) + ' 枚'
+    poolInfo.totalStaked = fmtToken(info._totalStaked) + ' 枚'
+    poolInfo.totalPaid = fmtToken(info._totalRewardPaid) + ' 枚'
   } catch (e) {
     console.error('loadPoolInfo:', e)
   }
@@ -158,6 +204,8 @@ async function loadStakes() {
   try {
     const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, props.provider)
     const count = await staking.getUserStakeCount(props.wallet)
+    hasActive.value = await staking.hasActiveStake(props.wallet)
+
     const list = []
     const now = Math.floor(Date.now() / 1000)
 
@@ -179,14 +227,18 @@ async function loadStakes() {
         timeDisplay = formatCountdown(remain)
       }
 
+      const tier = tierList.value[Number(info.tierId)]
+      const tierText = tier ? tier.durationText + ' / ' + tier.rateText : '--'
+
       list.push({
         amountDisplay: fmtToken(info.amount),
-        rewardDisplay: fmtBNB(info.reward),
+        rewardDisplay: fmtToken(info.reward),
         canUnstake: info.canUnstake,
         claimed,
         statusText,
         statusClass,
         timeDisplay,
+        tierText,
       })
     }
     stakes.value = list
@@ -197,7 +249,7 @@ async function loadStakes() {
 
 async function handleStake() {
   if (!props.signer) return alert('请先连接钱包')
-  if (hasActiveStake.value) return alert('当前已有质押，到期领取后方可再次质押')
+  if (hasActive.value) return alert('当前已有质押，到期领取后方可再次质押')
   stakeLoading.value = true
   try {
     const amt = parseUnits(String(stakeAmount.value || '0'), 18)
@@ -209,7 +261,7 @@ async function handleStake() {
       await appTx.wait()
     }
     const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, props.signer)
-    const tx = await staking.stake(amt)
+    const tx = await staking.stake(amt, selectedTier.value)
     await tx.wait()
     stakeAmount.value = ''
     await loadStakes()
@@ -239,8 +291,8 @@ async function handleUnstake(stakeId) {
   }
 }
 
-// 定时刷新倒计时
-onMounted(() => {
+onMounted(async () => {
+  await loadTiers()
   loadPoolInfo()
   loadStakes()
   timer = setInterval(() => {
@@ -276,12 +328,62 @@ watch(() => props.wallet, () => { loadPoolInfo(); loadStakes() })
   border-color: var(--accent-orange);
 }
 
+/* 档位选择 */
+.tier-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.tier-card {
+  flex: 1;
+  text-align: center;
+  padding: 12px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.tier-card.active {
+  border-color: var(--accent-orange);
+  background: rgba(255, 107, 53, 0.1);
+}
+.tier-card.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tier-duration {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.tier-rate {
+  font-size: 18px;
+  font-weight: 700;
+}
+.tier-reward {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
 .stake-info-row {
   display: flex;
   justify-content: space-between;
   font-size: 13px;
   color: var(--text-secondary);
   padding: 6px 0;
+}
+
+.pool-warning {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
 }
 
 .empty-state {
@@ -302,8 +404,8 @@ watch(() => props.wallet, () => { loadPoolInfo(); loadStakes() })
 
 .stake-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
@@ -311,6 +413,12 @@ watch(() => props.wallet, () => { loadPoolInfo(); loadStakes() })
   font-weight: 700;
   font-size: 14px;
   color: var(--text-primary);
+}
+
+.stake-tier {
+  font-size: 12px;
+  color: var(--text-dim);
+  flex: 1;
 }
 
 .stake-status {
@@ -346,16 +454,6 @@ watch(() => props.wallet, () => { loadPoolInfo(); loadStakes() })
 }
 .stake-detail .label { color: var(--text-secondary); }
 .stake-detail .value { color: var(--text-primary); font-weight: 600; font-family: var(--font-mono); }
-.pool-warning {
-  padding: 8px 12px;
-  font-size: 12px;
-  color: #ff9800;
-  background: rgba(255, 152, 0, 0.1);
-  border: 1px solid rgba(255, 152, 0, 0.3);
-  border-radius: var(--radius-sm);
-  line-height: 1.4;
-}
-
 .stake-detail .value.highlight {
   background: var(--gradient-fire);
   -webkit-background-clip: text;

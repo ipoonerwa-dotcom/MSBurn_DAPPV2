@@ -45,6 +45,7 @@ import { ref, shallowRef, computed, onMounted } from 'vue'
 import { BrowserProvider, JsonRpcProvider } from 'ethers'
 import StarsBg from './components/StarsBg.vue'
 import { getRefFromURL } from './utils/helpers.js'
+import { CHAIN_ID, CHAIN_CONFIG } from './utils/contracts.js'
 
 const walletAddress = ref('')
 const walletConnected = ref(false)
@@ -87,22 +88,45 @@ async function connectWallet() {
   try {
     const p = new BrowserProvider(window.ethereum)
     await p.send('eth_requestAccounts', [])
-    const s = await p.getSigner()
+    // 检查并切换到BSC
+    const network = await p.getNetwork()
+    if (Number(network.chainId) !== CHAIN_ID) {
+      try {
+        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CHAIN_CONFIG.chainId }] })
+      } catch (switchErr) {
+        if (switchErr.code === 4902) {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [CHAIN_CONFIG] })
+        } else {
+          throw switchErr
+        }
+      }
+    }
+    const p2 = new BrowserProvider(window.ethereum)
+    const s = await p2.getSigner()
     const addr = await s.getAddress()
-    provider.value = p
+    provider.value = p2
     signer.value = s
     walletAddress.value = addr
     walletConnected.value = true
 
     // 监听账户切换
-    window.ethereum.on('accountsChanged', (accounts) => {
+    window.ethereum.on('accountsChanged', async (accounts) => {
       if (accounts.length === 0) {
         walletAddress.value = ''
         walletConnected.value = false
-        provider.value = null
         signer.value = null
+        provider.value = new JsonRpcProvider('https://bsc-dataseed.binance.org/')
       } else {
         walletAddress.value = accounts[0]
+        // 重新创建signer确保指向新账户
+        try {
+          const p = new BrowserProvider(window.ethereum)
+          const s = await p.getSigner()
+          provider.value = p
+          signer.value = s
+        } catch (e) {
+          console.error('切换账户失败:', e)
+        }
       }
     })
   } catch (e) {

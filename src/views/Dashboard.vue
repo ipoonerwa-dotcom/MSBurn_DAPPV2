@@ -18,10 +18,6 @@
           <div class="stat-label">总销毁代币</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">{{ stats.totalBNBInvested }}</div>
-          <div class="stat-label">BNB总投入</div>
-        </div>
-        <div class="stat-item">
           <div class="stat-value">{{ stats.totalTokenInvested }}</div>
           <div class="stat-label">代币总投入</div>
         </div>
@@ -30,8 +26,12 @@
           <div class="stat-label">参与人数</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value">{{ stats.stakingPool }}</div>
-          <div class="stat-label">质押奖池BNB</div>
+          <div class="stat-value">{{ stats.totalExited }}</div>
+          <div class="stat-label">已出局人数</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">{{ stats.stakingRewardPool }}</div>
+          <div class="stat-label">质押奖池</div>
         </div>
         <div class="stat-item">
           <div class="stat-value">{{ stats.totalStaked }}</div>
@@ -44,23 +44,14 @@
     <div class="glass-card">
       <div class="section-title">
         <span class="icon">🏆</span>
-        <span>排行榜</span>
-      </div>
-
-      <!-- 排行榜通道切换 -->
-      <div class="tab-switch">
-        <button class="tab-item" :class="{ active: lbChannel === 'bnb' }" @click="lbChannel = 'bnb'">BNB榜</button>
-        <button class="tab-item" :class="{ active: lbChannel === 'token' }" @click="lbChannel = 'token'">代币榜</button>
+        <span>排行榜（本期）</span>
       </div>
 
       <!-- 奖池与倒计时 -->
       <div class="lb-pool-info">
         <div class="lb-pool">
           <span class="lb-pool-label">🏆 奖池</span>
-          <span class="lb-pool-value gradient-text">
-            {{ lbChannel === 'bnb' ? lbInfo.bnbPool : lbInfo.tokenPool }}
-            {{ lbChannel === 'bnb' ? 'BNB' : '枚' }}
-          </span>
+          <span class="lb-pool-value gradient-text">{{ lbInfo.pool }} 枚</span>
         </div>
         <div class="lb-pool">
           <span class="lb-pool-label">⏰ 开榜倒计时</span>
@@ -71,7 +62,7 @@
       <!-- 排名列表 -->
       <div class="lb-list">
         <div
-          v-for="(item, idx) in currentLeaderboard"
+          v-for="(item, idx) in leaderboardList"
           :key="idx"
           class="lb-item"
           :class="{ 'top-3': idx < 3 }"
@@ -86,7 +77,7 @@
           <div class="lb-amount gradient-text">{{ item.amount }}</div>
         </div>
 
-        <div v-if="currentLeaderboard.length === 0" class="empty-state">
+        <div v-if="leaderboardList.length === 0" class="empty-state">
           <p>暂无数据</p>
         </div>
       </div>
@@ -98,42 +89,39 @@
         <span>🥉10%</span>
         <span>4-10名均分55%</span>
       </div>
+
+      <div class="lb-note">
+        每12小时开榜，开榜后排名清零重新计算
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, watch, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { Contract } from 'ethers'
 import { DAPP_ADDRESS, DAPP_ABI, STAKING_ADDRESS, STAKING_ABI } from '../utils/contracts.js'
-import { fmtBNB, fmtToken, shortAddr, formatCountdown } from '../utils/helpers.js'
+import { fmtToken, shortAddr, formatCountdown } from '../utils/helpers.js'
 
 const props = defineProps(['wallet', 'provider', 'signer'])
 
-const lbChannel = ref('bnb')
 let timer = null
 
 const stats = reactive({
   totalBurned: '--',
-  totalBNBInvested: '--',
   totalTokenInvested: '--',
   totalParticipants: '--',
-  stakingPool: '--',
+  totalExited: '--',
+  stakingRewardPool: '--',
   totalStaked: '--',
 })
 
 const lbInfo = reactive({
-  bnbPool: '--',
-  tokenPool: '--',
+  pool: '--',
   countdown: '--',
 })
 
-const bnbLeaderboard = ref([])
-const tokenLeaderboard = ref([])
-
-const currentLeaderboard = computed(() => {
-  return lbChannel.value === 'bnb' ? bnbLeaderboard.value : tokenLeaderboard.value
-})
+const leaderboardList = ref([])
 
 async function loadStats() {
   if (!props.provider) return
@@ -141,21 +129,20 @@ async function loadStats() {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.provider)
     const staking = new Contract(STAKING_ADDRESS, STAKING_ABI, props.provider)
 
-    const [burned, bnbInv, tokenInv, pBNB, pToken, poolInfo] = await Promise.all([
+    const [burned, tokenInv, participants, exited, poolInfo] = await Promise.all([
       dapp.totalTokenBurned(),
-      dapp.totalBNBInvested(),
       dapp.totalTokenInvested(),
-      dapp.totalParticipantsBNB(),
-      dapp.totalParticipantsToken(),
+      dapp.totalParticipants(),
+      dapp.totalExited(),
       staking.getPoolInfo(),
     ])
 
-    stats.totalBurned = fmtToken(burned)
-    stats.totalBNBInvested = fmtBNB(bnbInv) + ' BNB'
+    stats.totalBurned = fmtToken(burned) + ' 枚'
     stats.totalTokenInvested = fmtToken(tokenInv) + ' 枚'
-    stats.totalParticipants = (Number(pBNB) + Number(pToken)).toString()
-    stats.stakingPool = fmtBNB(poolInfo.pool) + ' BNB'
-    stats.totalStaked = fmtToken(poolInfo.staked) + ' 枚'
+    stats.totalParticipants = Number(participants).toString()
+    stats.totalExited = Number(exited).toString()
+    stats.stakingRewardPool = fmtToken(poolInfo._rewardPool) + ' 枚'
+    stats.totalStaked = fmtToken(poolInfo._totalStaked) + ' 枚'
   } catch (e) {
     console.error('loadStats:', e)
   }
@@ -166,25 +153,20 @@ async function loadLeaderboard() {
   try {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.provider)
 
-    const [bnbLb, tokenLb, lbPool] = await Promise.all([
-      dapp.getBNBLeaderboard(),
-      dapp.getTokenLeaderboard(),
+    const [lb, lbPool] = await Promise.all([
+      dapp.getLeaderboard(),
       dapp.getLeaderboardPoolInfo(),
     ])
 
-    // BNB榜
-    bnbLeaderboard.value = bnbLb.addrs
-      .map((addr, i) => ({ addr: shortAddr(addr), amount: fmtBNB(bnbLb.amounts[i]) + ' BNB', raw: bnbLb.amounts[i] }))
+    leaderboardList.value = lb.addrs
+      .map((addr, i) => ({
+        addr: shortAddr(addr),
+        amount: fmtToken(lb.amounts[i]) + ' 枚',
+        raw: lb.amounts[i],
+      }))
       .filter(item => item.raw > 0n)
 
-    // 代币榜
-    tokenLeaderboard.value = tokenLb.addrs
-      .map((addr, i) => ({ addr: shortAddr(addr), amount: fmtToken(tokenLb.amounts[i]) + ' 枚', raw: tokenLb.amounts[i] }))
-      .filter(item => item.raw > 0n)
-
-    // 奖池
-    lbInfo.bnbPool = fmtBNB(lbPool.bnbPool)
-    lbInfo.tokenPool = fmtToken(lbPool.tokenPool)
+    lbInfo.pool = fmtToken(lbPool.pool)
 
     const now = Math.floor(Date.now() / 1000)
     const remain = Number(lbPool.nextDistributeTime) - now
@@ -213,7 +195,6 @@ watch(() => props.wallet, () => { loadStats(); loadLeaderboard() })
   grid-template-columns: repeat(2, 1fr);
 }
 
-/* 排行榜奖池信息 */
 .lb-pool-info {
   display: flex;
   justify-content: space-between;
@@ -241,7 +222,6 @@ watch(() => props.wallet, () => { loadStats(); loadLeaderboard() })
   font-family: var(--font-mono);
 }
 
-/* 排行列表 */
 .lb-list {
   display: flex;
   flex-direction: column;
@@ -270,9 +250,7 @@ watch(() => props.wallet, () => { loadStats(); loadLeaderboard() })
   flex-shrink: 0;
 }
 
-.medal {
-  font-size: 20px;
-}
+.medal { font-size: 20px; }
 
 .rank-num {
   font-size: 14px;
@@ -300,6 +278,13 @@ watch(() => props.wallet, () => { loadStats(); loadLeaderboard() })
   color: var(--text-dim);
   padding-top: 10px;
   border-top: 1px solid var(--border-color);
+}
+
+.lb-note {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 10px;
 }
 
 .empty-state {

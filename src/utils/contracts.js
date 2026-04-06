@@ -1,5 +1,5 @@
 // ============================================================
-//  合约地址与ABI配置
+//  v2 合约地址与ABI配置
 //  部署后替换地址即可
 // ============================================================
 
@@ -14,9 +14,9 @@ export const CHAIN_CONFIG = {
 }
 
 // ==================== 合约地址（部署后替换） ====================
-export const TOKEN_ADDRESS = '0x3Ab95642f783bf0A1901974e53F4ea6Be4DDdC81'
-export const DAPP_ADDRESS = '0x18188C6024905c48151cd4C4d61FfD4669aD24Ab'
-export const STAKING_ADDRESS = '0x5ce83EaF16DB893277B523ee7A725b6950f2e5F8'
+export const TOKEN_ADDRESS = '0x7410b419a069fCD9968bb5644ba9c311ADF181cB'
+export const DAPP_ADDRESS = '0x652984DE95c5b7652378629871a66221AAB3EbAc'
+export const STAKING_ADDRESS = '0xfbA899C1aB3B6ccFbB7723c021850Ce6C1C4E4D7'
 
 // ==================== Token ABI ====================
 export const TOKEN_ABI = [
@@ -29,49 +29,44 @@ export const TOKEN_ABI = [
   'function approve(address,uint256) returns (bool)',
 ]
 
-// ==================== BlackHoleDApp ABI ====================
+// ==================== BlackHoleDApp ABI (v2) ====================
 export const DAPP_ABI = [
   // 参与
-  'function participateBNB(address _ref) payable',
-  'function participateToken(address _ref, uint256 tokenAmount)',
+  'function participate(address _ref, uint256 tokenAmount)',
   // 领取
-  'function claimBNBDividend()',
-  'function claimTokenDividend()',
-  // 查询
-  'function pendingBNBDividend(address user) view returns (uint256)',
-  'function pendingTokenDividend(address user) view returns (uint256)',
-  'function getUserBNBInfo(address user) view returns (uint256 weight, uint256 totalReward, uint256 withdrawn, uint256 refCredited, uint256 lbCredited, uint256 pending)',
-  'function getUserTokenInfo(address user) view returns (uint256 weight, uint256 totalReward, uint256 withdrawn, uint256 refCredited, uint256 lbCredited, uint256 pending)',
-  'function getUserRefInfo(address user) view returns (address ref, uint256 l1, uint256 l2, uint256 refBNB, uint256 refTk, bool active)',
-  'function getBNBLeaderboard() view returns (address[10] addrs, uint256[10] amounts)',
-  'function getTokenLeaderboard() view returns (address[10] addrs, uint256[10] amounts)',
-  'function getLeaderboardPoolInfo() view returns (uint256 bnbPool, uint256 tokenPool, uint256 nextDistributeTime)',
+  'function claimDividend()',
+  // 查询 - 用户
+  'function getUserInfo(address user) view returns (uint256 weight, uint256 totalReward, uint256 withdrawn, uint256 refCredited, uint256 lbCredited, uint256 pending, bool active)',
+  'function getUserRefInfo(address user) view returns (address ref, uint256 l1, uint256 l2, uint256 refTotal, bool active)',
+  'function getLeaderboard() view returns (address[10] addrs, uint256[10] amounts)',
+  'function getLeaderboardPoolInfo() view returns (uint256 pool, uint256 nextDistributeTime)',
+  'function getPoolStats() view returns (uint256 _reservePool, uint256 _leaderboardPool, uint256 _totalActiveWeight, uint256 _totalDividendAdded, uint256 _contractBalance)',
   // 全局
-  'function totalParticipantsBNB() view returns (uint256)',
-  'function totalParticipantsToken() view returns (uint256)',
-  'function totalBNBInvested() view returns (uint256)',
+  'function totalParticipants() view returns (uint256)',
+  'function totalExited() view returns (uint256)',
   'function totalTokenInvested() view returns (uint256)',
   'function totalTokenBurned() view returns (uint256)',
-  'function totalActiveBNBWeight() view returns (uint256)',
-  'function totalActiveTokenWeight() view returns (uint256)',
+  'function totalActiveWeight() view returns (uint256)',
   'function referrer(address) view returns (address)',
   // 参数
-  'function minBNB() view returns (uint256)',
-  'function maxBNB() view returns (uint256)',
   'function minToken() view returns (uint256)',
   'function maxToken() view returns (uint256)',
+  'function tokenUnit() view returns (uint256)',
 ]
 
-// ==================== StakingPool ABI ====================
+// ==================== StakingPool ABI (v2) ====================
 export const STAKING_ABI = [
   // 操作
-  'function stake(uint256 tokenAmount)',
+  'function stake(uint256 tokenAmount, uint256 tierId)',
   'function unstake(uint256 stakeId)',
+  'function depositReward(uint256 amount)',
   // 查询
-  'function pendingReward(address user, uint256 stakeId) view returns (uint256)',
   'function getUserStakeCount(address user) view returns (uint256)',
-  'function getUserStakeInfo(address user, uint256 stakeId) view returns (uint256 amount, uint256 startTime, uint256 endTime, bool claimed, uint256 reward, bool canUnstake)',
-  'function getPoolInfo() view returns (uint256 pool, uint256 activeWeight, uint256 staked, uint256 distributed, uint256 snapshotCount, uint256 nextSettle)',
+  'function getUserStakeInfo(address user, uint256 stakeId) view returns (uint256 amount, uint256 tierId, uint256 startTime, uint256 endTime, uint256 reward, bool claimed, bool canUnstake)',
+  'function getPoolInfo() view returns (uint256 _rewardPool, uint256 _reservedReward, uint256 _totalStaked, uint256 _totalRewardPaid)',
+  'function getTierCount() view returns (uint256)',
+  'function tiers(uint256) view returns (uint256 duration, uint256 rewardRate, bool enabled)',
+  'function hasActiveStake(address) view returns (bool)',
   'function totalStaked() view returns (uint256)',
   'function rewardPool() view returns (uint256)',
 ]

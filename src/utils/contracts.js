@@ -14,9 +14,9 @@ export const CHAIN_CONFIG = {
 }
 
 // ==================== 合约地址（部署后替换） ====================
-export const TOKEN_ADDRESS = '0x7410b419a069fCD9968bb5644ba9c311ADF181cB'
-export const DAPP_ADDRESS = '0x652984DE95c5b7652378629871a66221AAB3EbAc'
-export const STAKING_ADDRESS = '0xfbA899C1aB3B6ccFbB7723c021850Ce6C1C4E4D7'
+export const TOKEN_ADDRESS = '0x840189BeAF120eBa8E09Df9F3762fA7ad500358F'
+export const DAPP_ADDRESS = '0xE10C797Eb24c28f466Be7Fa93AD7d70df63afceD'
+export const STAKING_ADDRESS = '0x1AA969627B5FF705A34EC818e9dCb438C3f1C8A2'
 
 // ==================== Token ABI ====================
 export const TOKEN_ABI = [

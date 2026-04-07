@@ -123,7 +123,7 @@ async function loadRefInfo() {
   try {
     const dapp = new Contract(DAPP_ADDRESS, DAPP_ABI, props.provider)
     const info = await dapp.getUserRefInfo(props.wallet)
-    refInfo.referrer = info.ref === '0x0000000000000000000000000000000000000000' ? '无' : shortAddr(info.ref)
+    refInfo.referrer = info.ref === '0x0000000000000000000000000000000000000000' ? '无' : info.ref
     refInfo.l1 = Number(info.l1).toString()
     refInfo.l2 = Number(info.l2).toString()
     refInfo.refTotal = fmtToken(info.refTotal)

@@ -25,7 +25,7 @@
         <span class="icon">🌀</span>
         <span>打入黑洞</span>
         <span style="margin-left: auto; font-size: 12px; color: var(--text-secondary);">
-          10万 - 20万枚
+          1万 - 20万枚
         </span>
       </div>
 
@@ -39,7 +39,7 @@
         <span class="unit">枚</span>
       </div>
       <div class="quick-btns">
-        <button v-for="v in [100000, 120000, 150000, 200000]" :key="v" class="quick-btn" @click="tokenAmount = v">
+        <button v-for="v in [10000, 30000, 50000, 100000, 150000, 200000]" :key="v" class="quick-btn" @click="tokenAmount = v">
           {{ v / 10000 }}万
         </button>
       </div>
